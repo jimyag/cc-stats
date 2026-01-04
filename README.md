@@ -6,7 +6,7 @@ Claude Code 用量统计工具 - 使用 OpenTelemetry Collector 收集数据，D
 
 - **实时数据采集** - 通过 OTEL Collector 接收 Claude Code 遥测数据
 - **历史数据导入** - 从本地 `~/.claude/projects/` 导入历史会话记录
-- **多维度统计** - Token 用量、费用、会话、模型、时间等多维分析
+- **多维度统计** - Token 用量、会话、模型、时间等多维分析
 - **实时仪表盘** - TUI 界面实时监控用量
 - **灵活查询** - 支持按时间范围、小时、会话等多种查询方式
 
@@ -123,10 +123,6 @@ cc-stats/
 - Output Tokens - 输出 token 数
 - Cache Read Tokens - 缓存读取 token 数
 - Cache Creation Tokens - 缓存创建 token 数
-
-### 费用统计
-
-按模型分组的 USD 费用统计
 
 ### 时间维度
 

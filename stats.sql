@@ -1,5 +1,6 @@
 -- Claude Code Token 用量统计
 -- 使用 DuckDB OTLP 扩展解析 OTEL 导出的数据
+-- 需要通过 -c "SET VARIABLE metrics_path = '...'" 传入路径
 
 INSTALL otlp FROM community;
 LOAD otlp;
@@ -9,9 +10,7 @@ LOAD otlp;
 -- 设置时区为本地时区
 SET TimeZone = 'Asia/Shanghai';
 
--- 定义数据路径
-SET VARIABLE metrics_path = '/Users/jimyag/src/github/jimyag/cc-stats/data/claude-metrics.jsonl';
-SET VARIABLE traces_path = '/Users/jimyag/src/github/jimyag/cc-stats/data/claude-traces.jsonl';
+-- metrics_path 需要从外部传入
 
 -- ============================================
 -- Token 用量统计
@@ -61,20 +60,6 @@ WHERE MetricName = 'claude_code.token.usage'
 GROUP BY 1
 ORDER BY 2 DESC;
 
--- ============================================
--- 费用统计
--- ============================================
-
-SELECT '=== 费用统计 ===' as info;
-
-SELECT
-    DATE_TRUNC('day', Timestamp::TIMESTAMP)::DATE as date,
-    COALESCE(Attributes['model'], 'unknown') as model,
-    ROUND(SUM(Value), 4) as cost_usd
-FROM read_otlp_metrics(getvariable('metrics_path'))
-WHERE MetricName = 'claude_code.cost.usage'
-GROUP BY 1, 2
-ORDER BY 1 DESC;
 
 -- ============================================
 -- 会话统计

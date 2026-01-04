@@ -69,7 +69,7 @@ show_stats() {
         exit 1
     fi
 
-    duckdb < "${SCRIPT_DIR}/stats.sql"
+    duckdb -c "SET VARIABLE metrics_path = '${METRICS_FILE}';" -c ".read '${SCRIPT_DIR}/stats.sql'"
 }
 
 # 按时间范围查询
@@ -113,15 +113,6 @@ SELECT
 FROM read_otlp_metrics(getvariable('metrics_path'))
 WHERE MetricName = 'claude_code.token.usage'
   AND (Timestamp::TIMESTAMP AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Shanghai' BETWEEN getvariable('start_ts') AND getvariable('end_ts');
-
-SELECT '=== 费用统计 ===' as info;
-SELECT
-    COALESCE(Attributes['model'], 'unknown') as model,
-    ROUND(SUM(Value), 4) as cost_usd
-FROM read_otlp_metrics(getvariable('metrics_path'))
-WHERE MetricName = 'claude_code.cost.usage'
-  AND (Timestamp::TIMESTAMP AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Shanghai' BETWEEN getvariable('start_ts') AND getvariable('end_ts')
-GROUP BY 1;
 
 SELECT '=== 按天明细 ===' as info;
 SELECT
