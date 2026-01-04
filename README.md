@@ -28,21 +28,21 @@ chmod +x cc-stats.sh import-history.sh
 
 ### 配置 Claude Code
 
-在 `~/.claude/settings.json` 中添加 OTEL 配置:
+在 `~/.claude/settings.json` 中添加以下配置:
 
 ```json
 {
-  "telemetry": {
-    "otel_endpoint": "http://localhost:4318"
+  "env": {
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "OTEL_METRICS_EXPORTER": "otlp",
+    "OTEL_LOGS_EXPORTER": "otlp",
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4318"
   }
 }
 ```
 
-或设置环境变量:
-
-```bash
-export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4318"
-```
+配置完成后，**重启 Claude Code** 使配置生效。
 
 ### 基本使用
 
