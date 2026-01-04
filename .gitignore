@@ -1,0 +1,16 @@
+# 数据文件
+data/*.jsonl
+data/*.backup.*
+data/.imported-sessions
+
+# macOS
+.DS_Store
+
+# 编辑器
+*.swp
+*.swo
+*~
+
+# 临时文件
+*.tmp
+*.temp

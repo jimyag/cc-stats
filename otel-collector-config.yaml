@@ -1,0 +1,28 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  file/metrics:
+    path: /data/claude-metrics.jsonl
+    format: json
+  file/traces:
+    path: /data/claude-traces.jsonl
+    format: json
+  file/logs:
+    path: /data/claude-logs.jsonl
+    format: json
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [file/metrics]
+    traces:
+      receivers: [otlp]
+      exporters: [file/traces]
+    logs:
+      receivers: [otlp]
+      exporters: [file/logs]
