@@ -38,6 +38,28 @@ check_deps() {
     fi
 }
 
+# 跨平台获取文件修改时间和大小
+get_file_stat() {
+    local file="$1"
+    if [[ "$(uname)" == "Darwin" ]]; then
+        stat -f '%m %z' "$file" 2>/dev/null
+    else
+        stat -c '%Y %s' "$file" 2>/dev/null
+    fi
+}
+
+# 跨平台解析 ISO 8601 时间戳为 Unix 时间戳
+parse_timestamp() {
+    local ts="$1"
+    if [[ "$(uname)" == "Darwin" ]]; then
+        # macOS: 使用 date -j -f
+        date -j -f "%Y-%m-%dT%H:%M:%S" "${ts%%.*}" "+%s" 2>/dev/null
+    else
+        # Linux: 使用 date -d
+        date -d "${ts}" "+%s" 2>/dev/null
+    fi
+}
+
 # 主导入函数 - 优化版
 import_history() {
     local days="${1:-30}"
@@ -90,7 +112,7 @@ import_history() {
 
         # 获取文件信息
         local file_stat
-        file_stat=$(stat -c '%Y %s' "$session_file" 2>/dev/null) || continue
+        file_stat=$(get_file_stat "$session_file") || continue
         local file_mtime=$(echo "$file_stat" | awk '{print $1}')
         local file_size=$(echo "$file_stat" | awk '{print $2}')
 
@@ -167,7 +189,7 @@ import_history() {
 
             # 转换时间戳
             local ts_sec
-            ts_sec=$(date -d "${timestamp}" "+%s" 2>/dev/null) || continue
+            ts_sec=$(parse_timestamp "${timestamp}") || continue
             local ts_nano="${ts_sec}000000000"
 
             # 生成 OTEL 记录
