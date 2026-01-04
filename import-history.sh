@@ -125,7 +125,7 @@ import_history() {
 
         # 检查是否已导入
         if [[ -f "$temp_imported" ]] && grep -qF "$session_file_hash" "$temp_imported" 2>/dev/null; then
-            ((skipped++))
+            ((skipped++)) || true
             continue
         fi
 
@@ -151,7 +151,7 @@ import_history() {
         local session_file="${entry%|*}"
         local session_file_hash="${entry#*|}"
 
-        ((processed++))
+        ((processed++)) || true
 
         # 显示进度
         if [[ $((processed % 10)) -eq 0 ]] || [[ $processed -eq $total_files ]]; then
@@ -195,7 +195,7 @@ import_history() {
             # 生成 OTEL 记录
             echo "{\"resourceMetrics\":[{\"resource\":{\"attributes\":[{\"key\":\"service.name\",\"value\":{\"stringValue\":\"claude-code\"}},{\"key\":\"service.version\",\"value\":{\"stringValue\":\"historical\"}}]},\"scopeMetrics\":[{\"scope\":{\"name\":\"com.anthropic.claude_code\",\"version\":\"historical\"},\"metrics\":[{\"name\":\"claude_code.token.usage\",\"description\":\"Number of tokens used\",\"unit\":\"tokens\",\"sum\":{\"dataPoints\":[{\"attributes\":[{\"key\":\"user.id\",\"value\":{\"stringValue\":\"historical-import\"}},{\"key\":\"session.id\",\"value\":{\"stringValue\":\"${session_id}\"}},{\"key\":\"type\",\"value\":{\"stringValue\":\"input\"}},{\"key\":\"model\",\"value\":{\"stringValue\":\"${model}\"}}],\"startTimeUnixNano\":\"${ts_nano}\",\"timeUnixNano\":\"${ts_nano}\",\"asDouble\":${input_tokens}},{\"attributes\":[{\"key\":\"user.id\",\"value\":{\"stringValue\":\"historical-import\"}},{\"key\":\"session.id\",\"value\":{\"stringValue\":\"${session_id}\"}},{\"key\":\"type\",\"value\":{\"stringValue\":\"output\"}},{\"key\":\"model\",\"value\":{\"stringValue\":\"${model}\"}}],\"startTimeUnixNano\":\"${ts_nano}\",\"timeUnixNano\":\"${ts_nano}\",\"asDouble\":${output_tokens}},{\"attributes\":[{\"key\":\"user.id\",\"value\":{\"stringValue\":\"historical-import\"}},{\"key\":\"session.id\",\"value\":{\"stringValue\":\"${session_id}\"}},{\"key\":\"type\",\"value\":{\"stringValue\":\"cacheRead\"}},{\"key\":\"model\",\"value\":{\"stringValue\":\"${model}\"}}],\"startTimeUnixNano\":\"${ts_nano}\",\"timeUnixNano\":\"${ts_nano}\",\"asDouble\":${cache_read}},{\"attributes\":[{\"key\":\"user.id\",\"value\":{\"stringValue\":\"historical-import\"}},{\"key\":\"session.id\",\"value\":{\"stringValue\":\"${session_id}\"}},{\"key\":\"type\",\"value\":{\"stringValue\":\"cacheCreation\"}},{\"key\":\"model\",\"value\":{\"stringValue\":\"${model}\"}}],\"startTimeUnixNano\":\"${ts_nano}\",\"timeUnixNano\":\"${ts_nano}\",\"asDouble\":${cache_creation}}],\"aggregationTemporality\":1,\"isMonotonic\":true}}]}]}]}" >> "$temp_file"
 
-            ((total_records++))
+            ((total_records++)) || true
         done <<< "$records"
 
         # 标记文件已导入
