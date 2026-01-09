@@ -3,6 +3,8 @@ services:
     image: otel/opentelemetry-collector-contrib:latest
     container_name: cc-stats-otel-collector
     restart: unless-stopped
+    # 以当前用户身份运行，确保文件权限正确
+    user: "${DOCKER_UID:-0}:${DOCKER_GID:-0}"
     ports:
       - "4318:4318"   # OTLP HTTP
       - "4317:4317"   # OTLP gRPC

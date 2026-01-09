@@ -36,6 +36,11 @@ start_collector() {
     mkdir -p "${DATA_DIR}"
 
     cd "${SCRIPT_DIR}"
+
+    # 设置容器运行的用户 ID，确保文件权限正确
+    export DOCKER_UID=$(id -u)
+    export DOCKER_GID=$(id -g)
+
     docker compose up -d
 
     log_info "OTEL Collector 已启动，监听 http://localhost:4318"

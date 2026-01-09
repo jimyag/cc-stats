@@ -146,7 +146,7 @@ import_history() {
         return
     fi
 
-    # 处理每个文件
+    # 处理每个文件 - 使用纯 jq 转换，避免 bash 循环
     for entry in "${files_to_process[@]}"; do
         local session_file="${entry%|*}"
         local session_file_hash="${entry#*|}"
@@ -158,45 +158,53 @@ import_history() {
             printf "\r${GREEN}[INFO]${NC} 处理进度: %d/%d (%d%%)" "$processed" "$total_files" "$((processed * 100 / total_files))"
         fi
 
-        # 使用 jq 一次性提取所有数据并转换
-        local records
-        records=$(jq -c '
+        # 使用单次 jq 调用完成所有转换，直接生成 OTEL 格式
+        local file_records
+        file_records=$(jq -c '
             select(.type == "assistant" and (.message.usage | type) == "object") |
+            # 解析 ISO 8601 时间戳为纳秒
+            (.timestamp | split(".")[0] | strptime("%Y-%m-%dT%H:%M:%S") | mktime | tostring + "000000000") as $ts_nano |
+            .sessionId as $sid |
+            (.message.model // "unknown") as $model |
+            (.message.usage.input_tokens // 0) as $input |
+            (.message.usage.output_tokens // 0) as $output |
+            (.message.usage.cache_read_input_tokens // 0) as $cache_read |
+            (.message.usage.cache_creation_input_tokens // 0) as $cache_creation |
             {
-                ts: .timestamp,
-                sid: .sessionId,
-                m: .message.model,
-                i: .message.usage.input_tokens,
-                o: .message.usage.output_tokens,
-                cr: (.message.usage.cache_read_input_tokens // 0),
-                cc: (.message.usage.cache_creation_input_tokens // 0)
+                resourceMetrics: [{
+                    resource: {
+                        attributes: [
+                            {key: "service.name", value: {stringValue: "claude-code"}},
+                            {key: "service.version", value: {stringValue: "historical"}}
+                        ]
+                    },
+                    scopeMetrics: [{
+                        scope: {name: "com.anthropic.claude_code", version: "historical"},
+                        metrics: [{
+                            name: "claude_code.token.usage",
+                            description: "Number of tokens used",
+                            unit: "tokens",
+                            sum: {
+                                dataPoints: [
+                                    {attributes: [{key: "user.id", value: {stringValue: "historical-import"}}, {key: "session.id", value: {stringValue: $sid}}, {key: "type", value: {stringValue: "input"}}, {key: "model", value: {stringValue: $model}}], startTimeUnixNano: $ts_nano, timeUnixNano: $ts_nano, asDouble: $input},
+                                    {attributes: [{key: "user.id", value: {stringValue: "historical-import"}}, {key: "session.id", value: {stringValue: $sid}}, {key: "type", value: {stringValue: "output"}}, {key: "model", value: {stringValue: $model}}], startTimeUnixNano: $ts_nano, timeUnixNano: $ts_nano, asDouble: $output},
+                                    {attributes: [{key: "user.id", value: {stringValue: "historical-import"}}, {key: "session.id", value: {stringValue: $sid}}, {key: "type", value: {stringValue: "cacheRead"}}, {key: "model", value: {stringValue: $model}}], startTimeUnixNano: $ts_nano, timeUnixNano: $ts_nano, asDouble: $cache_read},
+                                    {attributes: [{key: "user.id", value: {stringValue: "historical-import"}}, {key: "session.id", value: {stringValue: $sid}}, {key: "type", value: {stringValue: "cacheCreation"}}, {key: "model", value: {stringValue: $model}}], startTimeUnixNano: $ts_nano, timeUnixNano: $ts_nano, asDouble: $cache_creation}
+                                ],
+                                aggregationTemporality: 1,
+                                isMonotonic: true
+                            }
+                        }]
+                    }]
+                }]
             }
         ' "$session_file" 2>/dev/null) || continue
 
-        if [[ -z "$records" ]]; then
-            continue
+        if [[ -n "$file_records" ]]; then
+            echo "$file_records" >> "$temp_file"
+            local count=$(echo "$file_records" | wc -l)
+            ((total_records += count)) || true
         fi
-
-        # 转换为 OTEL 格式
-        while IFS= read -r record; do
-            local timestamp=$(echo "$record" | jq -r '.ts')
-            local session_id=$(echo "$record" | jq -r '.sid')
-            local model=$(echo "$record" | jq -r '.m // "unknown"')
-            local input_tokens=$(echo "$record" | jq -r '.i // 0')
-            local output_tokens=$(echo "$record" | jq -r '.o // 0')
-            local cache_read=$(echo "$record" | jq -r '.cr // 0')
-            local cache_creation=$(echo "$record" | jq -r '.cc // 0')
-
-            # 转换时间戳
-            local ts_sec
-            ts_sec=$(parse_timestamp "${timestamp}") || continue
-            local ts_nano="${ts_sec}000000000"
-
-            # 生成 OTEL 记录
-            echo "{\"resourceMetrics\":[{\"resource\":{\"attributes\":[{\"key\":\"service.name\",\"value\":{\"stringValue\":\"claude-code\"}},{\"key\":\"service.version\",\"value\":{\"stringValue\":\"historical\"}}]},\"scopeMetrics\":[{\"scope\":{\"name\":\"com.anthropic.claude_code\",\"version\":\"historical\"},\"metrics\":[{\"name\":\"claude_code.token.usage\",\"description\":\"Number of tokens used\",\"unit\":\"tokens\",\"sum\":{\"dataPoints\":[{\"attributes\":[{\"key\":\"user.id\",\"value\":{\"stringValue\":\"historical-import\"}},{\"key\":\"session.id\",\"value\":{\"stringValue\":\"${session_id}\"}},{\"key\":\"type\",\"value\":{\"stringValue\":\"input\"}},{\"key\":\"model\",\"value\":{\"stringValue\":\"${model}\"}}],\"startTimeUnixNano\":\"${ts_nano}\",\"timeUnixNano\":\"${ts_nano}\",\"asDouble\":${input_tokens}},{\"attributes\":[{\"key\":\"user.id\",\"value\":{\"stringValue\":\"historical-import\"}},{\"key\":\"session.id\",\"value\":{\"stringValue\":\"${session_id}\"}},{\"key\":\"type\",\"value\":{\"stringValue\":\"output\"}},{\"key\":\"model\",\"value\":{\"stringValue\":\"${model}\"}}],\"startTimeUnixNano\":\"${ts_nano}\",\"timeUnixNano\":\"${ts_nano}\",\"asDouble\":${output_tokens}},{\"attributes\":[{\"key\":\"user.id\",\"value\":{\"stringValue\":\"historical-import\"}},{\"key\":\"session.id\",\"value\":{\"stringValue\":\"${session_id}\"}},{\"key\":\"type\",\"value\":{\"stringValue\":\"cacheRead\"}},{\"key\":\"model\",\"value\":{\"stringValue\":\"${model}\"}}],\"startTimeUnixNano\":\"${ts_nano}\",\"timeUnixNano\":\"${ts_nano}\",\"asDouble\":${cache_read}},{\"attributes\":[{\"key\":\"user.id\",\"value\":{\"stringValue\":\"historical-import\"}},{\"key\":\"session.id\",\"value\":{\"stringValue\":\"${session_id}\"}},{\"key\":\"type\",\"value\":{\"stringValue\":\"cacheCreation\"}},{\"key\":\"model\",\"value\":{\"stringValue\":\"${model}\"}}],\"startTimeUnixNano\":\"${ts_nano}\",\"timeUnixNano\":\"${ts_nano}\",\"asDouble\":${cache_creation}}],\"aggregationTemporality\":1,\"isMonotonic\":true}}]}]}]}" >> "$temp_file"
-
-            ((total_records++)) || true
-        done <<< "$records"
 
         # 标记文件已导入
         echo "$session_file_hash" >> "$temp_imported"
